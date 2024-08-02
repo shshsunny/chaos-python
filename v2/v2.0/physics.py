@@ -19,6 +19,12 @@ force           f               mu·lu/s^2
 ## body
 class Body:
     RHO = 0.1 # common density of all bodies
+    def massOfRadius(r):
+        return Body.RHO*np.pi*r**2
+    
+    def radiusOfMass(m):
+        return np.sqrt(m/(Body.RHO*np.pi))
+    
     def __init__(self, pos=np.array([0,0]), vel=np.array([0,0]),mass=0, is_contacted=True, is_attracted=True, is_attractor=False, is_player=False):
         # position and velocity are represented by numpy 2-dimention vectors
         self.p=np.array(pos, dtype=float)              # position
@@ -54,7 +60,7 @@ class Environment:
         self.player = None
         self.settings = {
                 'border': True,
-                'size': np.array([1000, 800]),# np.array([1500, 1000]),              # width and height
+                'size': np.array([1200, 900]),# np.array([1500, 1000]),              # width and height
                 'gravity': True,
                 'gravitation-g': 100, # gravitation coefficient
                 'absorb': True,
@@ -168,6 +174,41 @@ class Environment:
                         attractor.v += np.array([ax, ay]) * self.settings['dt']
                     
                     
+
+def genOrbit(sun, env, R, m, theta, clockwise=True):
+    # generate a body that orbits around the sun with the orbitting radius R
+    thetap = theta+(np.pi/2)*(1 if clockwise else -1)
+    r = np.sqrt(m/(np.pi*Body.RHO))
+    v = np.sqrt(env.settings['gravitation-g']*sun.m/R)
+    return Body(sun.p+(R+r)*np.array([np.cos(theta), np.sin(theta)]),
+                                    v*np.array([np.cos(thetap), np.sin(thetap)]), m)
+
+def genRandomSolarSystemWithPlayer(env): # return a body list without modifying env
+    bodies = []
+    sun = Body(env.settings['size']/2, (0,0), 300, is_attractor=True, is_attracted=False, is_contacted=False)
+    bodies.append(sun)
+    totalOrbits = 12
+    massRange = [10, 30]
+    mediumMass = sum(massRange)/2
+    scarcity = 8
+    R = sun.r+20
+    clockwise = True
+    for i in range(totalOrbits):
+        ithBodies = []
+        expectedMotes = round((2*np.pi*R)/(Body.radiusOfMass(mediumMass)+20))//scarcity # expected motes in an orbit
+        theta = np.random.rand()*2*np.pi
+        for j in range(expectedMotes):
+            b = genOrbit(sun, env, R, np.random.randint(*massRange), theta, clockwise)
+            ithBodies.append(b)
+            theta += (2*b.r+10)*scarcity/R
+        bodies.extend(ithBodies)
+        maxRBody = max(ithBodies, key = lambda b: b.r)
+        R += maxRBody.r+10
+        clockwise = not clockwise
+
+    player = np.random.choice(bodies)
+    player.isPlayer = True
+    return bodies
                     
 if __name__ == "__main__":
     env = Environment()
@@ -185,8 +226,8 @@ if __name__ == "__main__":
 
     bodies.append(Body(np.array([np.random.randint(0, env.settings['size'][0]), np.random.randint(0, env.settings['size'][1])]), np.zeros(2), 70, is_player=True))
     """
-    sun = Body(env.settings['size']/2, (0,0), 100, is_attractor=True, is_attracted=False, is_contacted=False)
-    bodies.append(sun)
+    
+    '''bodies.append(sun)
     R = sun.r+10
     total = 15
     for i in range(total):
@@ -198,7 +239,7 @@ if __name__ == "__main__":
         body = Body(sun.p+(R+r)*np.array([np.cos(theta), np.sin(theta)]),
                                     v*np.array([np.cos(thetap), np.sin(thetap)]), m, is_player = (i == total//2))
         R += body.r+10
-        bodies.append(body)
+        bodies.append(body)'''
     
-    env.addBodies(bodies)
+    env.addBodies(genRandomSolarSystemWithPlayer(env))
     env.start()
